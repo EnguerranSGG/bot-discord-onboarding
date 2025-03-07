@@ -19,24 +19,39 @@ export class ChannelService {
   }
 
   async getStockChannels() {
-    const categoryId = process.env.STOCK_ID;
-    if (!categoryId) {
-      throw new Error("STOCK_ID non configuré.");
+    logger.info(`🔍 Début de getStockChannels()`);
+
+    const guild = await this.client.guilds.fetch(process.env.GUILD_ID!);
+
+    try {
+        const guildChannels = await guild.channels.fetch();
+        logger.info(`🔍 Nombre total de channels récupérés : ${guildChannels?.size}`);
+
+        if (!guildChannels) {
+            throw new Error("❌ Impossible de récupérer les channels du serveur.");
+        }
+
+        logger.info(`🔍 STOCK_ID défini ? ${process.env.STOCK_ID}`);
+
+        if (!process.env.STOCK_ID) {
+            throw new Error("❌ STOCK_ID est undefined !");
+        }
+
+        const channels = guildChannels.filter(channel =>
+            channel?.parentId === process.env.STOCK_ID &&
+            (channel!.type === ChannelType.GuildText || channel!.type === ChannelType.GuildVoice)
+        );
+
+        logger.info(`✅ Channels filtrés (${channels.size} trouvés) : ${JSON.stringify(channels.map(c => c!.name))}`);
+
+        return channels;
+    } catch (error) {
+        logger.error("❌ Erreur dans getStockChannels() :", error);
+        return [];
     }
+}
 
-    const guildChannels = await this.guild.channels.fetch();
-    const channels = guildChannels.filter(
-      (channel) =>
-        channel?.parentId === categoryId &&
-        (channel.type === ChannelType.GuildText ||
-          channel.type === ChannelType.GuildVoice)
-    );
 
-    return channels.map((channel) => ({
-      id: channel!.id,
-      name: channel!.name,
-    }));
-  }
 
   async createDiscordChannel(name: string, type: string, position: number) {
     logger.info(`🔍 DEBUG: Début de createDiscordChannel`);
@@ -140,61 +155,69 @@ export class ChannelService {
     }
   }
 
-  async updateDiscordChannel(
-    uuid: string,
-    updates: { name?: string; type?: string; channelPosition?: number }
-  ) {
+  async updateDiscordChannel(uuid: string, updates: { name?: string; channelPosition?: number }) {
+    logger.info(`🔍 DEBUG: Début de updateDiscordChannel`);
+    logger.info(`🔍 Channel UUID: ${uuid}`);
+    logger.info(`🔍 Paramètres reçus → ${JSON.stringify(updates)}`);
+
     try {
-      const discordChannel = await this.guild.channels.fetch(uuid);
-      if (!discordChannel) {
-        throw new Error(`❌ Channel ${uuid} non trouvé sur Discord.`);
-      }
+        // 1️⃣ Récupérer la guilde
+        const guild = await this.client.guilds.fetch(process.env.GUILD_ID!);
+        logger.info(`✅ Guild trouvée: ${guild.name} (${guild.id})`);
 
-      const discordUpdates: any = {};
-      if (updates.name) discordUpdates.name = updates.name;
-      if (updates.channelPosition !== undefined)
-        discordUpdates.position = updates.channelPosition;
+        // 2️⃣ Vérifier que le channel existe sur Discord
+        const discordChannel = await guild.channels.fetch(uuid);
+        if (!discordChannel) {
+            throw new Error(`❌ Channel ${uuid} non trouvé sur Discord.`);
+        }
+        logger.info(`✅ Channel trouvé sur Discord: ${discordChannel.name} (${discordChannel.id})`);
 
-      await discordChannel.edit(discordUpdates);
-      logger.info(`✅ Channel ${uuid} mis à jour sur Discord.`);
+        // 3️⃣ Construire les mises à jour
+        const discordUpdates: any = {};
+        if (updates.name) discordUpdates.name = updates.name;
+        if (updates.channelPosition !== undefined) discordUpdates.position = updates.channelPosition;
 
-      const updateChannelDto = {
-        name: updates.name,
-        channelPosition: updates.channelPosition,
-      };
+        // 4️⃣ Mettre à jour le channel sur Discord
+        await discordChannel.edit(discordUpdates);
+        logger.info(`✅ Channel ${uuid} mis à jour sur Discord.`);
 
-      const filteredUpdateDto = Object.fromEntries(
-        Object.entries(updateChannelDto).filter(([_, v]) => v !== undefined)
-      );
+        // 5️⃣ Construire l'objet de mise à jour pour l’API
+        const updateChannelDto = {
+            name: updates.name,
+            channelPosition: updates.channelPosition,
+        };
 
-      const response = await fetch(`${this.apiUrl}/channels/${uuid}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(filteredUpdateDto),
-      });
+        logger.info(`📡 Données envoyées à l'API: ${JSON.stringify(updateChannelDto)}`);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `❌ Erreur API lors de l'update : ${response.status} - ${errorText}`
-        );
-      }
+        // 6️⃣ Envoyer la mise à jour vers l'API
+        const response = await fetch(`${this.apiUrl}/channels/${uuid}`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(updateChannelDto),
+        });
 
-      const updatedChannel = await response.json();
-      logger.info(
-        `✅ Channel mis à jour dans la base de données : ${JSON.stringify(
-          updatedChannel
-        )}`
-      );
-      return updatedChannel;
+        // 7️⃣ Vérifier la réponse de l’API
+        const responseText = await response.text();
+        logger.info(`📡 Réponse API: ${response.status} - ${responseText}`);
+
+        if (!response.ok) {
+            throw new Error(`❌ Erreur API lors de l'update: ${response.status} - ${responseText}`);
+        }
+
+        // 8️⃣ Retourner la réponse mise à jour
+        const updatedChannelFromApi = JSON.parse(responseText);
+        logger.info(`✅ Channel mis à jour en base: ${JSON.stringify(updatedChannelFromApi)}`);
+
+        return updatedChannelFromApi;
     } catch (error) {
-      logger.error(
-        `❌ Erreur lors de la mise à jour du channel ${uuid} :`,
-        error
-      );
-      throw error;
+        logger.error(`❌ Erreur lors de la mise à jour du channel ${uuid}:`, error);
+        throw error;
     }
-  }
+}
+
+
 
   async deleteDiscordChannel(uuid: string) {
     try {
