@@ -1,9 +1,5 @@
 import {
   Interaction,
-  CommandInteraction,
-  StringSelectMenuInteraction,
-  ButtonInteraction,
-  ModalSubmitInteraction,
   Client,
   ChatInputCommandInteraction,
   MessageFlags,
