@@ -19,17 +19,8 @@ import { execute as executeShowCampusForm } from "../campuses/commands/show-camp
 import { execute as executeSetupIdentification } from "../identification_requests/commands/setupIdentificationButton";
 
 // Import des commandes stock-post
-import { handleModalSubmit as handleAddPostModal } from "../channels/commands/create-stock-post.command";
-import {
-  execute as executeUpdatePost,
-  handleSelectMenu as handleUpdateSelectMenu,
-  handleModalSubmit as handleUpdateModal,
-} from "../channels/commands/modify-stock-channel.command";
+
 import { execute as executeStockManagementForm } from "../channels/commands/stock-management.command";
-import {
-  execute as executeDeletePost,
-  handleDeleteChannel,
-} from "../channels/commands/delete-stock-post.command";
 import { StockManagementHandler } from "../channels/events/channels-interaction.handler";
 
 // Gestionnaire d'événements campus
@@ -262,7 +253,7 @@ export class InteractionHandler {
         case "setup-identification":
           await executeSetupIdentification(interaction);
           break;
-        case "stock-management-form": 
+        case "stock-management-form":
           await executeStockManagementForm(interaction);
           break;
         case "create-promo":
