@@ -87,14 +87,6 @@ export class InteractionHandler {
             );
             return;
           }
-          if (interaction.customId === "create-stock-post") {
-            await handleAddPostModal(interaction);
-            return;
-          }
-          if (interaction.customId.startsWith("update-stock-post-")) {
-            await handleUpdateModal(interaction);
-            return;
-          }
           if (interaction.customId === "identification-form") {
             const { execute } = await import(
               "../identification_requests/events/handleIdentificationForm"
@@ -122,20 +114,6 @@ export class InteractionHandler {
         }
 
         if (interaction.isStringSelectMenu()) {
-          if (interaction.customId === "select-stock-channel-update") {
-            logger.info(
-              `✅ Channel sélectionné pour modification : ${interaction.values[0]}`
-            );
-            await handleUpdateSelectMenu(interaction);
-            return;
-          }
-          if (interaction.customId === "select-stock-channel-delete") {
-            logger.info(
-              `🗑️ Channel sélectionné pour suppression : ${interaction.values[0]}`
-            );
-            await handleDeleteChannel(interaction);
-            return;
-          }
           if (interaction.customId.startsWith("role-select-")) {
             const { execute } = await import(
               "../identification_requests/events/handleRoleSelection"
@@ -284,7 +262,7 @@ export class InteractionHandler {
         case "setup-identification":
           await executeSetupIdentification(interaction);
           break;
-        case "stock-management-form": // 🔥 Ajout de la commande ici
+        case "stock-management-form": 
           await executeStockManagementForm(interaction);
           break;
         case "create-promo":
