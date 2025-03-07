@@ -34,9 +34,9 @@ export class StockManagementHandler {
         case "show-modify-channel":
           await this.showModifyChannelSelection(interaction);
           break;
-        /*case "show-delete-channel":
+        case "show-delete-channel":
                     await this.showDeleteChannelSelection(interaction);
-                    break;*/
+                    break;            
         default:
           logger.warn(`Bouton non géré : ${interaction.customId}`);
       }
@@ -105,6 +105,101 @@ export class StockManagementHandler {
       components: [row],
       flags: MessageFlags.Ephemeral,
     });
+  }
+
+  async showDeleteChannelSelection(interaction: ButtonInteraction) {
+    logger.info(`🔍 DEBUG: Début de showDeleteChannelSelection`);
+
+    if (!interaction.guild) {
+      logger.error("❌ Impossible de récupérer la guild depuis l'interaction.");
+      return interaction.reply({
+        content: "❌ Erreur : impossible de récupérer la guild.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const channels = await this.channelService.getStockChannels();
+    const channelsArray = Array.isArray(channels)
+      ? channels
+      : Array.from(channels.values()).filter((c) => c !== null);
+
+    logger.info(
+      `🔍 Channels récupérés pour suppression : ${JSON.stringify(
+        channelsArray.map((c) => c!.name)
+      )}`
+    );
+
+    if (!channelsArray.length) {
+      logger.error("❌ Aucun channel trouvé pour suppression.");
+      return interaction.reply({
+        content: "❌ Aucun channel trouvé.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId("select-stock-channel-delete")
+      .setPlaceholder("Sélectionne un channel à supprimer")
+      .addOptions(
+        channelsArray.map((channel) => ({
+          label: channel!.name,
+          value: channel!.id,
+        }))
+      );
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      selectMenu
+    );
+
+    logger.info(`✅ Menu de sélection pour suppression créé.`);
+
+    await interaction.reply({
+      content: "🗑️ Sélectionne un channel à supprimer :",
+      components: [row],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  async handleDeleteChannelSelection(interaction: StringSelectMenuInteraction) {
+    logger.info(`🔍 DEBUG: Début de handleDeleteChannelSelection`);
+
+    const channelId = interaction.values[0];
+    logger.info(`🔍 Channel sélectionné pour suppression : ${channelId}`);
+
+    if (!interaction.guild) {
+      logger.error("❌ Impossible de récupérer la guild.");
+      return interaction.reply({
+        content: "❌ Erreur : impossible de récupérer la guild.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const channel = await interaction.guild.channels.fetch(channelId);
+    if (!channel) {
+      logger.error(`❌ Channel non trouvé avec l'ID ${channelId}`);
+      return interaction.reply({
+        content: "❌ Channel introuvable.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    try {
+      await channel.delete();
+      logger.info(`✅ Channel supprimé : ${channelId}`);
+
+      await this.channelService.deleteDiscordChannel(channelId);
+
+      await interaction.reply({
+        content: `✅ Le channel a été supprimé avec succès !`,
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (error) {
+      logger.error(`❌ Erreur lors de la suppression du channel :`, error);
+      await interaction.reply({
+        content: "❌ Une erreur est survenue lors de la suppression du channel.",
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   }
 
   /**
@@ -401,6 +496,10 @@ logger.info(`📡 Données envoyées : ${JSON.stringify({
           `✅ Channel sélectionné pour modification : ${interaction.values[0]}`
         );
         await this.handleSelectMenu(interaction);
+        return;
+      }
+      if (interaction.customId === "select-stock-channel-delete") {
+        await this.handleDeleteChannelSelection(interaction);
         return;
       }
     }

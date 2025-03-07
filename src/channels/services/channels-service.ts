@@ -217,42 +217,42 @@ export class ChannelService {
     }
 }
 
+async deleteDiscordChannel(uuid: string) {
+    logger.info(`🔍 DEBUG: Début de deleteChannelFromAPI`);
+    logger.info(`🔍 Channel UUID: ${uuid}`);
 
-
-  async deleteDiscordChannel(uuid: string) {
     try {
-      // 🔹 Récupérer le channel Discord
-      const discordChannel = await this.guild.channels.fetch(uuid);
-      if (!discordChannel) {
-        throw new Error(`❌ Channel ${uuid} non trouvé sur Discord.`);
-      }
+        // 1️⃣ Appeler l'API pour supprimer le channel en base
+        logger.info(`📡 Requête de suppression à l'API pour le channel: ${uuid}`);
+        const response = await fetch(`${this.apiUrl}/channels/${uuid}`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ uuid }), // Ajout d'un body vide ou minimal
+        });
 
-      // 🔹 Supprimer le channel Discord
-      await discordChannel.delete();
-      logger.info(`✅ Channel ${uuid} supprimé de Discord.`);
+        // 2️⃣ Vérifier la réponse de l’API
+        const responseText = await response.text();
+        logger.info(`📡 Réponse API: ${response.status} - ${responseText}`);
 
-      // 🔹 Supprimer le channel dans l'API
-      const response = await fetch(`${this.apiUrl}/channels/${uuid}`, {
-        method: "DELETE",
-      });
+        if (!response.ok) {
+            throw new Error(`❌ Erreur API lors de la suppression du channel: ${response.status} - ${responseText}`);
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `❌ Erreur API lors de la suppression : ${response.status} - ${errorText}`
-        );
-      }
+        // 3️⃣ Retourner la confirmation de suppression
+        const deleteConfirmation = JSON.parse(responseText);
+        logger.info(`✅ Channel supprimé en base: ${JSON.stringify(deleteConfirmation)}`);
 
-      logger.info(`✅ Channel supprimé de la base de données : ${uuid}`);
-      return { message: "Channel supprimé avec succès." };
+        return deleteConfirmation;
     } catch (error) {
-      logger.error(
-        `❌ Erreur lors de la suppression du channel ${uuid} :`,
-        error
-      );
-      throw error;
+        logger.error(`❌ Erreur lors de la suppression du channel ${uuid}:`, error);
+        if (error instanceof Error) {
+            logger.error(error.stack ?? 'No stack trace available');
+        }
+        throw error;
     }
-  }
+}
 
   async validateStockCategory() {
     try {
