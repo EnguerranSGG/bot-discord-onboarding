@@ -124,7 +124,10 @@ export class StockChannelModifier {
     }
 
     const channelId = interaction.customId.replace("update-stock-post-", "");
-    logger.info(`🔍 Mise à jour du channel ${channelId}`);
+    // 🔍 ID de l'utilisateur Discord pour le rate limiting
+    const discordUserId = interaction.user.id;
+    
+    logger.info(`🔍 Mise à jour du channel ${channelId} par l'utilisateur ${discordUserId}`);
 
     const newName = interaction.fields.getTextInputValue("name");
     const newPosition = interaction.fields.getTextInputValue("position");
@@ -189,10 +192,11 @@ export class StockChannelModifier {
       logger.info(
         `🔍 Appel à updateDiscordChannel pour le channel ${channelId}`
       );
+      // ✅ Passer l'ID utilisateur pour le rate limiting par utilisateur Discord
       await this.channelService.updateDiscordChannel(channelId, {
         name: newName || undefined,
         channelPosition: newPosition ? parseInt(newPosition) : undefined,
-      });
+      }, discordUserId);  // ← ID de l'utilisateur pour le rate limiting
 
       logger.info(
         `✅ Mise à jour en base réussie pour le channel ${updatedChannel.name}`

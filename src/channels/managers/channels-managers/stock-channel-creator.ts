@@ -18,36 +18,50 @@ export class StockChannelCreator {
   }
 
   async showCreateChannelModal(interaction: ButtonInteraction) {
-    const modal = new ModalBuilder()
-      .setCustomId("create-stock-post")
-      .setTitle("Créer un nouveau channel");
+    try {
+        logger.debug(`📌 DEBUG: Affichage du modal de création de channel pour ${interaction.user.tag}`);
 
-    const nameInput = new TextInputBuilder()
-      .setCustomId("name")
-      .setLabel("Nom du channel")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
+        const modal = new ModalBuilder()
+            .setCustomId("create-stock-post")
+            .setTitle("Créer un nouveau channel");
 
-    const typeChoice = new TextInputBuilder()
-      .setCustomId("type")
-      .setLabel("Type (text/voice)")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
+        const nameInput = new TextInputBuilder()
+            .setCustomId("name")
+            .setLabel("Nom du channel")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-    const positionInput = new TextInputBuilder()
-      .setCustomId("position")
-      .setLabel("Position")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
+        const typeChoice = new TextInputBuilder()
+            .setCustomId("type")
+            .setLabel("Type (text/voice)")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-    modal.addComponents(
-      new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(typeChoice),
-      new ActionRowBuilder<TextInputBuilder>().addComponents(positionInput)
-    );
+        const positionInput = new TextInputBuilder()
+            .setCustomId("position")
+            .setLabel("Position")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-    await interaction.showModal(modal);
-  }
+        modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(typeChoice),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(positionInput)
+        );
+
+        await interaction.showModal(modal);
+        logger.debug(`✅ Modal affiché avec succès`);
+    } catch (error) {
+        logger.error("❌ Erreur lors de l'affichage du modal de création", error);
+        if (!interaction.replied) {
+            await interaction.reply({
+                content: "❌ Une erreur est survenue lors de l'affichage du formulaire.",
+                flags: MessageFlags.Ephemeral,
+            });
+        }
+    }
+}
+
 
   async handleCreateStockPost(interaction: ModalSubmitInteraction) {
     try {
@@ -59,8 +73,11 @@ export class StockChannelCreator {
         interaction.fields.getTextInputValue("position")
       );
 
+      // ID de l'utilisateur Discord pour le rate limiting
+      const discordUserId = interaction.user.id;
+
       logger.info(
-        `📥 Création du channel : name=${name}, type=${type}, position=${position}`
+        `📥 Création du channel : name=${name}, type=${type}, position=${position}, userId=${discordUserId}`
       );
 
       if (type !== "text" && type !== "voice") {
@@ -77,10 +94,12 @@ export class StockChannelCreator {
         return;
       }
 
+      // ✅ Passer l'ID utilisateur pour le rate limiting par utilisateur Discord
       const newChannel = await this.channelService.createDiscordChannel(
         name,
         type,
-        position
+        position,
+        discordUserId  // ← ID de l'utilisateur pour le rate limiting
       );
       logger.info(`✅ Channel créé : ${newChannel.id}`);
 

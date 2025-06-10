@@ -72,7 +72,9 @@ export class StockChannelDeleter {
     logger.info(`🔍 DEBUG: Début de handleDeleteChannelSelection`);
 
     const channelId = interaction.values[0];
-    logger.info(`🔍 Channel sélectionné pour suppression : ${channelId}`);
+    const discordUserId = interaction.user.id;
+    
+    logger.info(`🔍 Channel sélectionné pour suppression : ${channelId} par l'utilisateur ${discordUserId}`);
 
     if (!interaction.guild) {
       logger.error("❌ Impossible de récupérer la guild.");
@@ -95,7 +97,7 @@ export class StockChannelDeleter {
       await channel.delete();
       logger.info(`✅ Channel supprimé : ${channelId}`);
 
-      await this.channelService.deleteDiscordChannel(channelId);
+      await this.channelService.deleteDiscordChannel(channelId, discordUserId);
 
       await interaction.reply({
         content: `✅ Le channel a été supprimé avec succès !`,
