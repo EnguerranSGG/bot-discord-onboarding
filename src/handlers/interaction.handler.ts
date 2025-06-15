@@ -56,11 +56,12 @@ export class InteractionHandler {
       ) {
         logger.info(`📝 Interaction détectée : ${interaction.customId}`);
         if (
-          interaction.customId === "show-create-channel" ||
+          interaction.customId === "show-create-modal" ||
           interaction.customId === "show-modify-channel" ||
           interaction.customId === "show-delete-channel" ||
           interaction.customId === "select-stock-channel-update" ||
           interaction.customId === "select-stock-channel-delete" ||
+          interaction.customId === "select-management-target" || // Ajout de la gestion du menu déroulant
           interaction.customId.startsWith("update-stock-post-") ||
           interaction.customId === "create-stock-post"
         ) {
