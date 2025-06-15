@@ -11,6 +11,7 @@ import {
 } from "discord.js";
 import { logger } from "../../../config/logger";
 import { ChannelService } from "../../services/channels-service";
+import { InputSanitizer } from "../../../utils/input-sanitizer";
 
 export class StockChannelModifier {
   private channelService: ChannelService;
@@ -129,13 +130,66 @@ export class StockChannelModifier {
     
     logger.info(`🔍 Mise à jour du channel ${channelId} par l'utilisateur ${discordUserId}`);
 
-    const newName = interaction.fields.getTextInputValue("name");
-    const newPosition = interaction.fields.getTextInputValue("position");
+    // Récupération des valeurs brutes du formulaire
+    const rawNewName = interaction.fields.getTextInputValue("name");
+    const rawNewPosition = interaction.fields.getTextInputValue("position");
 
     logger.info(
-      `🔍 Nouveaux paramètres → Nom: ${newName || "inchangé"}, Position: ${
-        newPosition || "inchangée"
-      }`
+      `📥 Valeurs brutes reçues → Nom: "${rawNewName || "inchangé"}", Position: "${rawNewPosition || "inchangée"}"`
+    );
+
+    // ✅ SANITISATION ET VALIDATION des champs (uniquement s'ils sont fournis)
+    const sanitizationErrors: string[] = [];
+    let sanitizedName: string | undefined;
+    let sanitizedPosition: number | undefined;
+
+    // Sanitisation du nom (seulement si fourni)
+    if (rawNewName && rawNewName.trim()) {
+      const nameResult = InputSanitizer.sanitizeChannelName(rawNewName);
+      if (nameResult.isValid) {
+        sanitizedName = nameResult.value as string;
+        logger.info(`✅ Nom sanitisé : "${rawNewName}" → "${sanitizedName}"`);
+      } else {
+        sanitizationErrors.push(...nameResult.errors);
+        logger.warn(`❌ Erreurs nom : ${nameResult.errors.join(', ')}`);
+      }
+    }
+
+    // Sanitisation de la position (seulement si fournie)
+    if (rawNewPosition && rawNewPosition.trim()) {
+      const positionResult = InputSanitizer.sanitizeChannelPosition(rawNewPosition);
+      if (positionResult.isValid) {
+        sanitizedPosition = positionResult.value as number;
+        logger.info(`✅ Position sanitisée : "${rawNewPosition}" → ${sanitizedPosition}`);
+      } else {
+        sanitizationErrors.push(...positionResult.errors);
+        logger.warn(`❌ Erreurs position : ${positionResult.errors.join(', ')}`);
+      }
+    }
+
+    // Si des erreurs de sanitisation, on les affiche
+    if (sanitizationErrors.length > 0) {
+      const errorMessage = `❌ Données invalides :\n${sanitizationErrors.join('\n')}`;
+      logger.warn(`❌ Validation échouée pour ${discordUserId}: ${sanitizationErrors.join(', ')}`);
+      
+      await interaction.reply({
+        content: errorMessage,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Si aucun champ fourni, on informe l'utilisateur
+    if (!sanitizedName && sanitizedPosition === undefined) {
+      await interaction.reply({
+        content: "❌ Aucune modification fournie. Veuillez remplir au moins un champ.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    logger.info(
+      `✅ Données finales sanitisées → Nom: ${sanitizedName || "inchangé"}, Position: ${sanitizedPosition ?? "inchangée"}`
     );
 
     const guild = interaction.guild;
@@ -160,11 +214,11 @@ export class StockChannelModifier {
 
     logger.info(`✅ Channel trouvé : ${channel.name}`);
 
-    // Mise à jour du channel sur Discord
+    // Mise à jour du channel sur Discord avec les données sanitisées
     const updatedChannel = await channel.edit({
-      name: newName || channel.name,
-      position: newPosition
-        ? parseInt(newPosition)
+      name: sanitizedName || channel.name,
+      position: sanitizedPosition !== undefined
+        ? sanitizedPosition
         : "position" in channel
         ? channel.position
         : undefined,
@@ -183,8 +237,8 @@ export class StockChannelModifier {
     );
     logger.info(
       `📡 Données envoyées : ${JSON.stringify({
-        name: newName || undefined,
-        channelPosition: newPosition ? parseInt(newPosition) : undefined,
+        name: sanitizedName || undefined,
+        channelPosition: sanitizedPosition || undefined,
       })}`
     );
 
@@ -194,8 +248,8 @@ export class StockChannelModifier {
       );
       // ✅ Passer l'ID utilisateur pour le rate limiting par utilisateur Discord
       await this.channelService.updateDiscordChannel(channelId, {
-        name: newName || undefined,
-        channelPosition: newPosition ? parseInt(newPosition) : undefined,
+        name: sanitizedName || undefined,
+        channelPosition: sanitizedPosition || undefined,
       }, discordUserId);  // ← ID de l'utilisateur pour le rate limiting
 
       logger.info(

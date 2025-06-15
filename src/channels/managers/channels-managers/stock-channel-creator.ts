@@ -9,6 +9,7 @@ import {
 } from "discord.js";
 import { logger } from "../../../config/logger";
 import { ChannelService } from "../../services/channels-service";
+import { InputSanitizer } from "../../../utils/input-sanitizer";
 
 export class StockChannelCreator {
   private channelService: ChannelService;
@@ -67,40 +68,51 @@ export class StockChannelCreator {
     try {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-      const name = interaction.fields.getTextInputValue("name");
-      const type = interaction.fields.getTextInputValue("type");
-      const position = parseInt(
-        interaction.fields.getTextInputValue("position")
-      );
+      // Récupération des valeurs brutes du formulaire
+      const rawName = interaction.fields.getTextInputValue("name");
+      const rawType = interaction.fields.getTextInputValue("type");
+      const rawPosition = interaction.fields.getTextInputValue("position");
 
       // ID de l'utilisateur Discord pour le rate limiting
       const discordUserId = interaction.user.id;
 
       logger.info(
-        `📥 Création du channel : name=${name}, type=${type}, position=${position}, userId=${discordUserId}`
+        `📥 Tentative de création du channel : rawName=${rawName}, rawType=${rawType}, rawPosition=${rawPosition}, userId=${discordUserId}`
       );
 
-      if (type !== "text" && type !== "voice") {
+      // ✅ SANITISATION ET VALIDATION des champs
+      const sanitizationResult = InputSanitizer.sanitizeChannelForm(
+        rawName,
+        rawType,
+        rawPosition
+      );
+
+      // Si la sanitisation a échoué, on renvoie les erreurs
+      if (!sanitizationResult.isValid) {
+        const errorMessage = `❌ Données invalides :\n${sanitizationResult.errors.join('\n')}`;
+        logger.warn(`❌ Validation échouée pour ${discordUserId}: ${sanitizationResult.errors.join(', ')}`);
+        
         await interaction.editReply({
-          content: "❌ Le type doit être 'text' ou 'voice'.",
+          content: errorMessage,
         });
         return;
       }
 
-      if (isNaN(position) || position < 0) {
-        await interaction.editReply({
-          content: "❌ La position doit être un nombre positif.",
-        });
-        return;
-      }
+      // Utilisation des données sanitisées
+      const { name, type, position } = sanitizationResult.sanitizedData;
 
-      // ✅ Passer l'ID utilisateur pour le rate limiting par utilisateur Discord
+      logger.info(
+        `✅ Données sanitisées : name=${name}, type=${type}, position=${position}, userId=${discordUserId}`
+      );
+
+      // Création du channel avec les données sanitisées
       const newChannel = await this.channelService.createDiscordChannel(
         name,
         type,
         position,
-        discordUserId  // ← ID de l'utilisateur pour le rate limiting
+        discordUserId
       );
+      
       logger.info(`✅ Channel créé : ${newChannel.id}`);
 
       await interaction.editReply({
