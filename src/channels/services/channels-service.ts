@@ -1,5 +1,6 @@
 import { Client, Guild, ChannelType } from "discord.js";
 import { logger } from "../../config/logger";
+import { authService } from "../../services/auth.service";
 
 interface CreateChannelDto {
   uuid: string;
@@ -59,10 +60,10 @@ export class ChannelService {
     }
   }
 
-  async createDiscordChannel(name: string, type: string, position: number) {
+  async createDiscordChannel(name: string, type: string, position: number, discordUserId?: string) {
     logger.info(`🔍 DEBUG: Début de createDiscordChannel`);
     logger.info(
-      `🔍 Paramètres reçus → Name: ${name}, Type: ${type}, Position: ${position}`
+      `🔍 Paramètres reçus → Name: ${name}, Type: ${type}, Position: ${position}, User: ${discordUserId || 'Non spécifié'}`
     );
     logger.info(`🔍 Guild ID: ${this.guild?.id}`);
     logger.info(`🔍 STOCK_ID: ${process.env.GUILD_ID!}`);
@@ -120,8 +121,6 @@ export class ChannelService {
       );
 
       // 4️⃣ Construire l'objet CreateChannelDto
-      //    Note : channelPosition peut aussi être newChannel.position
-      //    ou newChannel.rawPosition, selon la façon dont Discord gère la position finale.
       const createChannelDto: CreateChannelDto = {
         uuid: newChannel.id, // ID Discord du channel
         name: newChannel.name, // Nom actuel du channel
@@ -131,16 +130,41 @@ export class ChannelService {
         uuidCategory: category.id, // ID Discord de la catégorie
       };
 
-      // 5️⃣ Envoyer une requête POST vers l'API Nest.js
+      // 5️⃣ Envoyer une requête POST vers l'API Nest.js AVEC AUTHENTIFICATION
+      logger.info("🔐 Récupération du token d'authentification...");
+      const headers = await authService.getAuthHeaders(discordUserId);
+      
       const response = await fetch(`${this.apiUrl}/channels`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: headers,
         body: JSON.stringify(createChannelDto),
       });
 
       if (!response.ok) {
+        // Si erreur 401, tenter de renouveler le token
+        if (response.status === 401) {
+          logger.warn("🔄 Token expiré, renouvellement...");
+          await authService.forceReauthenticate();
+          const newHeaders = await authService.getAuthHeaders(discordUserId);
+          
+          const retryResponse = await fetch(`${this.apiUrl}/channels`, {
+            method: "POST",
+            headers: newHeaders,
+            body: JSON.stringify(createChannelDto),
+          });
+          
+          if (!retryResponse.ok) {
+            const errorText = await retryResponse.text();
+            throw new Error(
+              `Erreur API Channels après retry: ${retryResponse.status} - ${errorText}`
+            );
+          }
+          
+          const retryData = await retryResponse.json();
+          logger.info(`✅ Channel enregistré en base (après retry) : ${JSON.stringify(retryData)}`);
+          return newChannel;
+        }
+        
         // Gérer le cas d'erreur HTTP
         const errorText = await response.text();
         throw new Error(
@@ -148,11 +172,11 @@ export class ChannelService {
         );
       }
 
-      // 6️⃣ Récupérer la réponse de l’API
+      // 6️⃣ Récupérer la réponse de l'API
       const data = await response.json();
       logger.info(`✅ Channel enregistré en base : ${JSON.stringify(data)}`);
 
-      return newChannel; // ou return data si tu veux renvoyer l'objet de l’API
+      return newChannel; // ou return data si tu veux renvoyer l'objet de l'API
     } catch (error) {
       logger.error(error, "Erreur lors de la création du channel Discord");
       throw error;
@@ -163,11 +187,13 @@ export class ChannelService {
 
   async updateDiscordChannel(
     uuid: string,
-    updates: { name?: string; channelPosition?: number }
+    updates: { name?: string; channelPosition?: number },
+    discordUserId?: string
   ) {
     logger.info(`🔍 DEBUG: Début de updateDiscordChannel`);
     logger.info(`🔍 Channel UUID: ${uuid}`);
     logger.info(`🔍 Paramètres reçus → ${JSON.stringify(updates)}`);
+    logger.info(`🔍 User ID: ${discordUserId || 'Non spécifié'}`);
 
     try {
       // 1️⃣ Récupérer la guilde
@@ -193,7 +219,7 @@ export class ChannelService {
       await discordChannel.edit(discordUpdates);
       logger.info(`✅ Channel ${uuid} mis à jour sur Discord.`);
 
-      // 5️⃣ Construire l'objet de mise à jour pour l’API
+      // 5️⃣ Construire l'objet de mise à jour pour l'API
       const updateChannelDto = {
         name: updates.name,
         channelPosition: updates.channelPosition,
@@ -203,16 +229,17 @@ export class ChannelService {
         `📡 Données envoyées à l'API: ${JSON.stringify(updateChannelDto)}`
       );
 
-      // 6️⃣ Envoyer la mise à jour vers l'API
+      // 6️⃣ Envoyer la mise à jour vers l'API AVEC AUTHENTIFICATION
+      logger.info("🔐 Récupération du token d'authentification...");
+      const headers = await authService.getAuthHeaders(discordUserId);
+      
       const response = await fetch(`${this.apiUrl}/channels/${uuid}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: headers,
         body: JSON.stringify(updateChannelDto),
       });
 
-      // 7️⃣ Vérifier la réponse de l’API
+      // 7️⃣ Vérifier la réponse de l'API
       const responseText = await response.text();
       logger.info(`📡 Réponse API: ${response.status} - ${responseText}`);
 
@@ -240,26 +267,52 @@ export class ChannelService {
     }
   }
 
-  async deleteDiscordChannel(uuid: string) {
+  async deleteDiscordChannel(uuid: string, discordUserId?: string) {
     logger.info(`🔍 DEBUG: Début de deleteChannelFromAPI`);
     logger.info(`🔍 Channel UUID: ${uuid}`);
+    logger.info(`🔍 User ID: ${discordUserId || 'Non spécifié'}`);
 
     try {
-      // 1️⃣ Appeler l'API pour supprimer le channel en base
+      // 1️⃣ Appeler l'API pour supprimer le channel en base AVEC AUTHENTIFICATION
       logger.info(`📡 Requête de suppression à l'API pour le channel: ${uuid}`);
+      logger.info("🔐 Récupération du token d'authentification...");
+      const headers = await authService.getAuthHeaders(discordUserId);
+      
       const response = await fetch(`${this.apiUrl}/channels/${uuid}`, {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: headers,
         body: JSON.stringify({ uuid }), // Ajout d'un body vide ou minimal
       });
 
-      // 2️⃣ Vérifier la réponse de l’API
+      // 2️⃣ Vérifier la réponse de l'API
       const responseText = await response.text();
       logger.info(`📡 Réponse API: ${response.status} - ${responseText}`);
 
       if (!response.ok) {
+        // Si erreur 401, tenter de renouveler le token
+        if (response.status === 401) {
+          logger.warn("🔄 Token expiré, renouvellement...");
+          await authService.forceReauthenticate();
+          const newHeaders = await authService.getAuthHeaders(discordUserId);
+          
+          const retryResponse = await fetch(`${this.apiUrl}/channels/${uuid}`, {
+            method: "DELETE",
+            headers: newHeaders,
+            body: JSON.stringify({ uuid }),
+          });
+          
+          if (!retryResponse.ok) {
+            const errorText = await retryResponse.text();
+            throw new Error(
+              `Erreur API Channels DELETE après retry: ${retryResponse.status} - ${errorText}`
+            );
+          }
+          
+          const retryData = await retryResponse.text();
+          logger.info(`✅ Channel supprimé en base (après retry)`);
+          return JSON.parse(retryData);
+        }
+        
         throw new Error(
           `❌ Erreur API lors de la suppression du channel: ${response.status} - ${responseText}`
         );
