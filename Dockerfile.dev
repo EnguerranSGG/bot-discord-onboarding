@@ -20,8 +20,5 @@ USER app-user
 # Copier le code source
 COPY --chown=app-user:app-user . .
 
-# Exposer le port (optionnel pour le bot, mais utile si vous ajoutez un serveur web)
-EXPOSE 3001
-
 # Démarrer en mode développement avec nodemon
 CMD ["npm", "run", "dev"] 
