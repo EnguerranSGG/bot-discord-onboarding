@@ -122,12 +122,12 @@ export class ChannelService {
 
       // 4️⃣ Construire l'objet CreateChannelDto
       const createChannelDto: CreateChannelDto = {
-        uuid: newChannel.id, // ID Discord du channel
-        name: newChannel.name, // Nom actuel du channel
-        type: type, // "text" ou "voice" (ou "announcement" si tu l'ajoutes)
-        channelPosition: position, // Ou newChannel.position
-        uuidGuild: guild.id, // ID Discord de la guilde
-        uuidCategory: category.id, // ID Discord de la catégorie
+        uuid: newChannel.id, 
+        name: newChannel.name, 
+        type: type,
+        channelPosition: position,
+        uuidGuild: guild.id, 
+        uuidCategory: category.id,
       };
 
       // 5️⃣ Envoyer une requête POST vers l'API Nest.js AVEC AUTHENTIFICATION
