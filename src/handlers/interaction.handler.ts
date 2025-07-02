@@ -61,7 +61,7 @@ export class InteractionHandler {
           interaction.customId === "show-delete-channel" ||
           interaction.customId === "select-stock-channel-update" ||
           interaction.customId === "select-stock-channel-delete" ||
-          interaction.customId === "select-management-target" || // Ajout de la gestion du menu déroulant
+          interaction.customId === "select-management-target" || 
           interaction.customId.startsWith("update-stock-post-") ||
           interaction.customId === "create-stock-post"
         ) {
@@ -231,7 +231,6 @@ export class InteractionHandler {
 
     try {
       switch (commandName) {
-        // Gestion des campus
         case "course-form":
           await executeShowCourseForm(interaction);
           break;
