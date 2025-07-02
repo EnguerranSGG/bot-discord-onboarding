@@ -68,7 +68,7 @@ export class StockChannelCreator {
     try {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-      // Récupération des valeurs brutes du formulaire
+      // Récupération des valeurs du formulaire
       const rawName = interaction.fields.getTextInputValue("name");
       const rawType = interaction.fields.getTextInputValue("type");
       const rawPosition = interaction.fields.getTextInputValue("position");
@@ -80,14 +80,14 @@ export class StockChannelCreator {
         `📥 Tentative de création du channel : rawName=${rawName}, rawType=${rawType}, rawPosition=${rawPosition}, userId=${discordUserId}`
       );
 
-      // ✅ SANITISATION ET VALIDATION des champs
+      // Sanitisation + validation des champs
       const sanitizationResult = InputSanitizer.sanitizeChannelForm(
         rawName,
         rawType,
         rawPosition
       );
 
-      // Si la sanitisation a échoué, on renvoie les erreurs
+      // Échec de la sanitisation
       if (!sanitizationResult.isValid) {
         const errorMessage = `❌ Données invalides :\n${sanitizationResult.errors.join('\n')}`;
         logger.warn(`❌ Validation échouée pour ${discordUserId}: ${sanitizationResult.errors.join(', ')}`);
