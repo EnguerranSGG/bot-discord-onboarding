@@ -20,7 +20,7 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: CommandInteraction) {
   try {
-    // Vérification des permissions avec notre service centralisé
+    // Vérification des permissions
     const member = interaction.member as GuildMember;
     const permissionResult = PermissionService.checkChannelManagementPermissions(member);
     
@@ -54,14 +54,15 @@ export async function execute(interaction: CommandInteraction) {
       .setColor("#FF0000")
       .setFooter({ text: "Bot de gestion du stock • v1.0" });
 
-    const categoryId = process.env.STOCK_ID; // ID de la catégorie stock
+    const categoryId = process.env.STOCK_ID; 
     logger.debug(`📌 Category ID utilisé pour le filtrage: ${categoryId}`);
 
-    // Récupérer tous les forums de la catégorie stock
-    const channels = await interaction.guild!.channels.fetch(); // Force la récupération
+    // Récupére tous les forums/channels de la catégorie stock
+    const channels = await interaction.guild!.channels.fetch(); 
 
     logger.debug(`📌 Channels récupérés (${channels.size}) :`, channels.map(c => `${c!.name} (${c!.type})`));
 
+    // Filtre uniquement les forums 
     const forums = channels.filter(
       (channel) =>
         channel!.parentId === categoryId &&
@@ -70,7 +71,7 @@ export async function execute(interaction: CommandInteraction) {
 
     logger.debug(`📌 Forums trouvés (${forums.size}) :`, forums.map(f => f!.name));
 
-    // Construire la liste des options du menu déroulant
+    // liste les forums récupérés
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId("select-management-target")
       .setPlaceholder("Sélectionne ce que tu veux gérer")
