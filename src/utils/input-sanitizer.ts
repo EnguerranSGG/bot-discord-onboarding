@@ -18,9 +18,6 @@ export class InputSanitizer {
     const errors: string[] = [];
     let sanitizedName = name;
 
-    // Nettoie les espaces en début/fin
-    sanitizedName = sanitizedName.trim();
-
     // Vérifie la longueur
     if (sanitizedName.length === 0) {
       errors.push("Le nom du channel ne peut pas être vide");
@@ -29,17 +26,20 @@ export class InputSanitizer {
       sanitizedName = sanitizedName.substring(0, 100);
     }
 
-    // Convertit en minuscules et remplace les espaces par des tirets
+    // Retire les espaces au début et à la fin
+    sanitizedName = sanitizedName.trim();
+
+    // Retire les tirets au début et à la fin
+    sanitizedName = sanitizedName.replace(/^-+|-+$/g, '');
+
+    // Met en minuscules et remplace les espaces par des tirets
     sanitizedName = sanitizedName.toLowerCase();
     sanitizedName = sanitizedName.replace(/\s+/g, '-');
 
-    // Supprime les caractères interdits pour Discord
+    // Supprime les caractères interdits par Discord
     sanitizedName = sanitizedName.replace(/[^a-z0-9\-_]/g, '');
 
-    // Assure qu'il ne commence/finit pas par un tiret
-    sanitizedName = sanitizedName.replace(/^-+|-+$/g, '');
-
-    // Évite les noms réservés
+    // Empêche les noms réservés
     const reservedNames = ['everyone', 'here', 'admin', 'mod', 'moderator'];
     if (reservedNames.includes(sanitizedName)) {
       errors.push("Ce nom de channel est réservé");
