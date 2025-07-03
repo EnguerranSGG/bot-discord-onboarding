@@ -74,10 +74,10 @@ export class ChannelService {
     this.isCreating = true;
 
     try {
-      // 1️⃣ Récupérer la guild
+      // Récupére la guild
       const guild = await this.client.guilds.fetch(process.env.GUILD_ID!);
 
-      // 2️⃣ Vérifier que la catégorie existe
+      // Vérifie que la catégorie existe
       const category = await guild.channels.fetch(process.env.STOCK_ID!);
       logger.info(
         `🔍 Catégorie récupérée : ${category ? category.name : "Aucune"} (ID: ${
@@ -98,7 +98,7 @@ export class ChannelService {
         `✅ Catégorie stock trouvée : ${category.name} (${category.id})`
       );
 
-      // 3️⃣ Créer le channel côté Discord
+      // Crée le channel côté Discord
       const newChannel = await guild.channels.create({
         name: name,
         type: type === "text" ? ChannelType.GuildText : ChannelType.GuildVoice,
@@ -120,7 +120,7 @@ export class ChannelService {
         `✅ Channel créé sur Discord : ${newChannel.name} (${newChannel.id})`
       );
 
-      // 4️⃣ Construire l'objet CreateChannelDto
+      // Construit l'objet CreateChannelDto
       const createChannelDto: CreateChannelDto = {
         uuid: newChannel.id, 
         name: newChannel.name, 
@@ -130,7 +130,7 @@ export class ChannelService {
         uuidCategory: category.id,
       };
 
-      // 5️⃣ Envoyer une requête POST vers l'API Nest.js AVEC AUTHENTIFICATION
+      // Envoye une requête POST vers l'API avec l'authentification et la header perso pour le throttling
       logger.info("🔐 Récupération du token d'authentification...");
       const headers = await authService.getAuthHeaders(discordUserId);
       
@@ -141,7 +141,7 @@ export class ChannelService {
       });
 
       if (!response.ok) {
-        // Si erreur 401, tenter de renouveler le token
+        // Si erreur 401, tente de renouveler le token
         if (response.status === 401) {
           logger.warn("🔄 Token expiré, renouvellement...");
           await authService.forceReauthenticate();
@@ -165,14 +165,14 @@ export class ChannelService {
           return newChannel;
         }
         
-        // Gérer le cas d'erreur HTTP
+        // Gére le cas d'erreur HTTP
         const errorText = await response.text();
         throw new Error(
           `Erreur API Channels: ${response.status} - ${errorText}`
         );
       }
 
-      // 6️⃣ Récupérer la réponse de l'API
+      // Récupére la réponse de l'API
       const data = await response.json();
       logger.info(`✅ Channel enregistré en base : ${JSON.stringify(data)}`);
 
